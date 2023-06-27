@@ -1,0 +1,58 @@
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <style>
+            body { overflow: hidden; }
+
+            canvas
+            {
+                position: absolute;
+                top: 0%;
+                left: 0%;
+            }
+
+            @media screen and (max-height : 400px)
+            {
+                .hotspot
+                {
+                    width: 20px; 
+                    height: 20px;
+                    border-radius: 50%;
+                    border-style: solid;
+                    border-color: rgb(232, 117, 36);
+                    background-color: rgb(221, 221, 221);
+                    z-index: 1;
+                }
+            }
+
+            @media screen and (min-height : 400px)
+            {
+                .hotspot
+                {
+                    width: 40px; 
+                    height: 40px;
+                    border-radius: 50%;
+                    border-style: solid;
+                    border-color: rgb(232, 117, 36);
+                    background-color: rgb(221, 221, 221);
+                    z-index: 1;
+                }
+            }
+
+            .hotspot:hover { transform: scale(1.2); }
+        </style>
+        <script type="importmap">
+            {
+                "imports":
+                {
+                    "three": "../../node_modules/three/src/Three.js",
+					"gltf-loader": "../../node_modules/three/examples/jsm/loaders/GLTFLoader.js",
+					"draco-loader": "../../node_modules/three/examples/jsm/loaders/DRACOLoader.js",
+                    "engine": "../../engine/Engine.js"
+                }
+            }
+        </script>
+        <script type="module" src="app/index.js"></script>
+    </head>
+    <body><canvas></canvas></body>
+</html>
