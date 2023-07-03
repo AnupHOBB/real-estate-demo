@@ -18,7 +18,14 @@ export class Hotspot extends SceneObject
         this.lastRasterCoord = { x: -1, y: -1 }
         this.worldPosition = worldPosition
         this.input = new HotspotInput(this.div)
+        this.enableOcclusion = true
     }
+
+    /**
+     * Hides the hotspot if occluded by another boject in the scene
+     * @param {Boolean} hide whether to hide the hotspot on occlusion
+     */
+    hideOnOcclusion(hide) { this.enableOcclusion = hide }
 
     /**
      * Sets the click callback
@@ -92,6 +99,35 @@ export class Hotspot extends SceneObject
             document.body.removeChild(this.div)
             this.isVisible = false
         }
+    }
+
+    onSceneRender(sceneManager)
+    {
+        let rasterCoord = sceneManager.worldToRaster(this.worldPosition)
+        if (rasterCoord != undefined)
+        {
+            let show = true
+            if (this.enableOcclusion)
+            {
+                let hitPointData = sceneManager.shootRay(rasterCoord)
+                show &&= hitPointData.length > 0
+                if (show)
+                {
+                    let viewPosition = sceneManager.worldToView(this.worldPosition)
+                    let hitPointView = sceneManager.worldToView(hitPointData[0].point)
+                    show &&= viewPosition.z <= hitPointView.z
+                }
+            }
+            if (show)
+            {
+                this.setRasterCoordinates(rasterCoord.x, rasterCoord.y) 
+                this.show()
+            }
+            else
+                this.hide()
+        }
+        else
+            this.hide()
     }
 }
 

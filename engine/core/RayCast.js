@@ -46,7 +46,7 @@ export class RayCast
      * Raycasts among objects and returns the hit point.
      * @param {THREE.Vector2} rasterCoord raster coordinate that is used as the ray cast origin point
      * @param {BaseCameraManager} cameraManager BaseCameraManager object
-     * @returns {THREE.Vector3} hit point in world space
+     * @returns {any} object that holds the intersection data of all the hit objects
      */
     raycast(rasterCoord, cameraManager)
     {
@@ -54,6 +54,6 @@ export class RayCast
         let screenSpaceY = -(rasterCoord.y / window.innerHeight) *  2 + 1
         this.raycaster.setFromCamera({ x: screenSpaceX, y: screenSpaceY }, cameraManager.getCamera())
         let hitObjects = this.raycaster.intersectObjects(this.raycastObjects)
-        return (hitObjects.length > 0) ? hitObjects[0].point : undefined
+        return (hitObjects.length > 0) ? hitObjects : []
     }
 }

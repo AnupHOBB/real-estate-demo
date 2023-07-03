@@ -93,15 +93,17 @@ export class MeshModel extends SceneObject
     /**
      * @param {String} name name of the object which is used in sending or receiving message
      * @param {any} model model data extracted from a 3D file
+     * @param {Boolean} cullBackFace culls the back face of triangles if set to true
      */
-    constructor(name, model)
+    constructor(name, model, cullBackFace)
     {
         super(name)
         this.scene = model.scene.clone()
         Misc.postOrderTraversal(this.scene, mesh => {
             if (mesh.material != undefined)
             {
-                mesh.material.side = THREE.FrontSide
+                if (cullBackFace != undefined && cullBackFace != null && cullBackFace)
+                    mesh.material.side = THREE.FrontSide
                 if (mesh.material.opacity == 1 && mesh.material._alphaTest == 0)
                 {
                     mesh.material.shadowSide = THREE.BackSide
@@ -292,9 +294,9 @@ export class MeshModel extends SceneObject
 
 export class InstancedModel extends MeshModel
 {
-    constructor(name, model, instanceCount)
+    constructor(name, model, instanceCount, cullBackFace)
     {
-        super(name, model)
+        super(name, model, cullBackFace)
         this._instanceMeshMap = new Map()
         this._modelMatrixMap = new Map()
         this._positions = new Array(instanceCount).fill(new THREE.Vector3(), 0, instanceCount)

@@ -190,13 +190,26 @@ export class SceneManager
     unregister(name) { this.core.unregister(name) }
 
     /**
-     * Delegates call to SceneCore's getRasterCoordIfNearest.  
+     * Delegates call to SceneCore's worldToView.
      * @param {THREE.Vector3} worldPosition position of point in world whose raster coordinate is required
-     * @returns {[THREE.Vector2, Boolean]} [raster coordinate of the point whose world coordinate was given, 
-     * boolean value to indicate whether the raster coordinate is valid or not]
+     * @returns {THREE.Vector3} view space coordinate of the point whose world coordinate was given
      */
-    getRasterCoordIfNearest(worldPosition) { return this.core.getRasterCoordIfNearest(worldPosition) }
+    worldToView(worldPosition) { return this.core.worldToView(worldPosition) }
 
+    /**
+     * Delegates call to SceneCore's worldToRaster.
+     * @param {THREE.Vector3} worldPosition position of point in world whose raster coordinate is required
+     * @returns {THREE.Vector2} array of hit info data
+     */
+    worldToRaster(worldPosition) { return this.core.worldToRaster(worldPosition) }
+
+    /**
+     * Delegates call to SceneCore's shootRay.
+     * @param {THREE.Vector3} worldPosition position of point in world whose raster coordinate is required
+     * @returns {Array} array of hit info data
+     */
+    shootRay(rasterCoord) { return this.core.shootRay(rasterCoord) }
+    
     /**
      * Delegates call to SceneCore's setActiveCamera.  
      * @param {String} name name of the camera to be activated. 
@@ -217,12 +230,6 @@ export class SceneManager
      * @param {any} data data to be received by all objects
      */
     broadcastToAll(from, data) { this.core.broadcastToAll(from, data) }
-
-    /**
-     * Delegates call to SceneCore's showFramerate.   
-     * @param {HTMLParagraphElement} fpsCounterElement HTML element taht displays fps
-     */
-    showFramerate(fpsCounterElement) { this.core.showFramerate(fpsCounterElement) }
 
     setEnvironmentMap(envmap) { this.core.setEnvironmentMap(envmap) }
 
@@ -271,6 +278,8 @@ export class SceneManager
     setBrightness(brightness) { this.core.setBrightness(brightness) }
 
     setGamma(gamma) { this.core.setGamma(gamma) }
+
+    showStats(htmlElement) { this.core.showStats(htmlElement) }
 }
 
 /**
@@ -292,25 +301,7 @@ class SceneCore
         this.inactiveObjNameMap = new Map()
         this.messageMap = new Map()
         this.sceneRenderer = new SceneRenderer(canvas)
-        this.showFPS = false
         this.renderLoop()
-        this.fpsCounter = 0
-    }
-
-    /**
-     * Displays the render framerate in an html element
-     * @param {HTMLParagraphElement} fpsCounterElement HTML element taht displays fps
-     */
-    showFramerate(fpsCounterElement)
-    {
-        if (!this.showFPS && fpsCounterElement != undefined && fpsCounterElement != null)
-        {
-            this.showFPS = true
-            setInterval(()=>{
-                fpsCounterElement.innerHTML = 'FPS : '+this.fpsCounter
-                this.fpsCounter = 0
-            }, 1000)
-        }
     }
 
     /**
@@ -328,7 +319,7 @@ class SceneCore
             this.addToScene(sceneObject)     
             sceneObject.onSceneStart(this.sceneManager)
         }
-        this.popNoticeBoard(sceneObject)
+        this.checkForMessages(sceneObject)
     }
 
     /**
@@ -350,7 +341,7 @@ class SceneCore
      * Checks any messages for the scene object in the notice board and sends that message to it if there is one.
      * @param {SceneObject} sceneObject sceneObject that needs to be notified if a message was posted for it.
      */
-    popNoticeBoard(sceneObject)
+    checkForMessages(sceneObject)
     {
         let messages = this.messageMap.get(sceneObject.name)
         if (messages != undefined)
@@ -362,29 +353,32 @@ class SceneCore
     }
 
     /**
-     * Converts the world coordinate value of a point in raster coordinate and also returns a boolean to indicate
-     * whether that raster coordinate is valid or not.
-     * The raster value will only be returned if the world position given is the nearest and is not occluded by any other object 
-     * in the scene. This is checked by performing a ray cast at that point. 
+     * Converts the world coordinate value of a point in view space coordinate
      * @param {THREE.Vector3} worldPosition position of point in world whose raster coordinate is required
-     * @returns {[THREE.Vector2, Boolean]} [raster coordinate of the point whose world coordinate was given, 
-     * boolean value to indicate whether the raster coordinate is valid or not]
+     * @returns {THREE.Vector3} view space coordinate of the point whose world coordinate was given
      */
-    getRasterCoordIfNearest(worldPosition)
+    worldToView(worldPosition) { return this.activeCameraManager.worldToView(worldPosition) }
+
+    /**
+     * Converts the world coordinate value of a point in raster coordinate
+     * @param {THREE.Vector3} worldPosition position of point in world whose raster coordinate is required
+     * @returns {THREE.Vector2} raster coordinate of the point whose world coordinate was given
+     */
+    worldToRaster(worldPosition) { return this.activeCameraManager.worldToRaster(worldPosition) }
+
+    /**
+     * Returns the data of all the objects hit by the ray. The data will be in this format:
+     * { distance, point, face, faceIndex, object }
+     * @param {THREE.Vector3} worldPosition position of point in world whose raster coordinate is required
+     * @returns {Array} array of hit info data
+     */
+    shootRay(rasterCoord)
     {
-        let [rasterCoord, isValid] = this.activeCameraManager.worldToRaster(worldPosition)
-        if (isValid)
-        {        
-            let hitPointWorld = this.raycast.raycast(rasterCoord, this.activeCameraManager)
-            isValid &&= hitPointWorld != undefined
-            if (isValid)
-            {
-                let viewPosition = this.activeCameraManager.worldToView(worldPosition)
-                let hitPointView = this.activeCameraManager.worldToView(hitPointWorld)
-                isValid &&= viewPosition.z <= hitPointView.z
-            }
-        } 
-        return [rasterCoord, isValid]
+        if (rasterCoord != undefined && rasterCoord.x >= 0 && rasterCoord.x < window.innerWidth 
+            && rasterCoord.y >= 0 && rasterCoord.y < window.innerHeight)
+            return this.raycast.raycast(rasterCoord, this.activeCameraManager)
+        else
+            return []
     }
 
     /**
@@ -484,6 +478,8 @@ class SceneCore
 
     setGamma(gamma) { this.sceneRenderer.setGamma(gamma) }
 
+    showStats(htmlElement) { this.sceneRenderer.showStats(htmlElement) }
+
     /**
      * The loop that renders all drawable objects into the screen.
      * This functions resizes camera based on screen aspect ratio, checks if there are any new objects ready to be part of scene,
@@ -499,8 +495,6 @@ class SceneCore
             this.sceneRenderer.render()
             this.notifyObjects()
         }
-        if (this.showFPS)
-            this.fpsCounter++
         window.requestAnimationFrame(()=>this.renderLoop())
     }
 

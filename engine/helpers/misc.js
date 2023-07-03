@@ -105,5 +105,28 @@ export const Misc =
                 this.postOrderTraversal(threeJsObject.children[i], onNodeReach, values)
         }
         onNodeReach(threeJsObject, values)
+    },
+
+    postOrderTraversalForDeletion : function(mesh, shouldDelete)
+    {
+        if (mesh != undefined && mesh != null)
+        {
+            if (shouldDelete(mesh))
+            {
+                if (mesh.parent != undefined && mesh.parent != null)
+                {
+                    let meshIndex = mesh.parent.children.indexOf(mesh)
+                    mesh.parent.children.splice(meshIndex, 1)
+                }
+            }
+            else
+            {    
+                let children = []
+                for (let i=0; i < mesh.children.length; i++)
+                    children.push(mesh.children[i])
+                for (let i=0; i < children.length; i++)   
+                    this.postOrderTraversalForDeletion(children[i], shouldDelete)
+            }
+        }
     }
 }

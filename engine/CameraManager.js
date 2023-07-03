@@ -1,7 +1,7 @@
 import * as THREE from 'three'
-import { SceneObject } from '../core/SceneManager.js'
-import { Maths } from '../helpers/maths.js'
-import { Matrix } from '../helpers/matrix.js'
+import { SceneObject } from './core/SceneManager.js'
+import { Maths } from './helpers/maths.js'
+import { Matrix } from './helpers/matrix.js'
 
 /**
  * Parent class for all camera managers
@@ -12,12 +12,6 @@ export class CameraManager extends SceneObject
      * @param {String} name name of the object which is used in sending or receiving message
      */
     constructor(name) { super(name) }
-
-    /**
-     * Used to register inputs. This function needs to be overriden by sub classes
-     * @param {InputManager} inputManager the input manager object that manages user input 
-     */
-    registerInput(inputManager) {}
 
     /**
      * Returns the threejs camera object stored within
@@ -82,13 +76,14 @@ export class PerspectiveCamera
      * Converts the world coordinate value of a point in raster coordinate and also returns a boolean to indicate
      * whether that raster coordinate is valid or not 
      * @param {THREE.Vector3} worldPosition position of point in world whose raster coordinate is required
-     * @returns {THREE.Vector2} raster coordinate of the point whose world coordinate was given
+     * @returns {[THREE.Vector2, Boolean]} [raster coordinate of the point whose world coordinate was given, 
+     * boolean value to indicate whether the raster coordinate is valid or not]
      */
     worldToRaster(worldPosition)
     {
         let viewPosition = Matrix.mat4XVec3(this.viewMatrix, worldPosition)
         if (viewPosition.z < this.camera.near || viewPosition.z > this.camera.far)
-            return undefined
+            return [, false]
         let projectedX = (this.camera.near * viewPosition.x)/viewPosition.z
         let projectedY = (this.camera.near * viewPosition.y)/viewPosition.z
         let screenTopBound = this.camera.near * Math.tan(Maths.toRadians(this.camera.fov/2))
@@ -96,12 +91,12 @@ export class PerspectiveCamera
         let screenRightBound = screenTopBound * this.camera.aspect
         let screenLeftBound = -screenRightBound
         if (projectedX < screenLeftBound || projectedX > screenRightBound)
-            return undefined
-        if (projectedY < screenBottomBound || projectedY > screenTopBound)
-            return undefined
+            return [, false]
+        if (projectedY < this.screenBottomBound || projectedY > screenTopBound)
+            return [, false]
         let rasterX = (window.innerWidth * (projectedX - screenLeftBound))/(screenRightBound - screenLeftBound)
-        let rasterY = (window.innerHeight * (screenTopBound - projectedY))/(screenTopBound - screenBottomBound)
-        return { x: rasterX, y: rasterY }
+        let rasterY = (window.innerHeight * (screenTopBound - projectedY))/(screenTopBound - screenBottomBound) 
+        return [{ x: rasterX, y: rasterY }, true]
     }
 
     /**

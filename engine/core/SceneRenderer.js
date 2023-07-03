@@ -12,11 +12,10 @@ import { SharpnessPass } from './pass/SharpnessPass.js'
 import { ColorBalancePass } from './pass/ColorBalancePass.js'
 import { ShaderPass } from '../../node_modules/three/examples/jsm/postprocessing/ShaderPass.js'
 import { SSAOPass } from '../../node_modules/three/examples/jsm/postprocessing/SSAOPass.js'
-import { SSRPass } from '../../node_modules/three/examples/jsm/postprocessing/SSRPass.js'
 import { SSAARenderPass } from '../../node_modules/three/examples/jsm/postprocessing/SSAARenderPass.js'
 import { FXAAShader } from '../../node_modules/three/examples/jsm/shaders/FXAAShader.js'
-import { ReflectorForSSRPass } from '../../node_modules/three/examples/jsm/objects/ReflectorForSSRPass.js'
 import { Misc } from '../helpers/misc.js'
+import { Stats } from './Stats.js'
 
 /**
  * Wraps SceneRendererCore object
@@ -101,6 +100,8 @@ export class SceneRenderer
     setBrightness(brightness) { this.core.setBrightness(brightness) }
 
     setGamma(gamma) { this.core.setGamma(gamma) }
+
+    showStats(htmlElement) { this.core.showStats(htmlElement) }
     
     /**
      * Delegates call to SceneRendererCore render
@@ -135,8 +136,8 @@ class SceneRendererCore
         this.ssaoComposer.renderToScreen = false
         this.ssrComposer = new EffectComposer(this.renderer)
         this.ssrComposer.renderToScreen = false
-        this.ssaaComposer = new EffectComposer(this.renderer)
-        this.ssaaComposer.renderToScreen = false
+        this.sceneRenderComposer = new EffectComposer(this.renderer)
+        this.sceneRenderComposer.renderToScreen = false
         this.finalComposer = new EffectComposer(this.renderer)
 
         this.bloomIntensity = 0
@@ -145,7 +146,7 @@ class SceneRendererCore
         this.renderPass = null
         this.ssaoPass = null
         this.ssaaPass = null
-        this.pixelMergerPass = new PixelMergerPass(this.ssaaComposer.readBuffer.texture, this.ssaoComposer.readBuffer.texture)
+        this.pixelMergerPass = new PixelMergerPass(this.sceneRenderComposer.readBuffer.texture, this.ssaoComposer.readBuffer.texture)
         this.saturationPass = new SaturationPass(1)
         this.contrastPass = new ContrastPass(0)
         this.brightnessPass = new BrightnessPass(0)
@@ -154,7 +155,7 @@ class SceneRendererCore
         this.colorBalancePass = new ColorBalancePass(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3())
         this.gammaPass = new GammaCorrectionPass(2.2)
         this.bloomComposer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 3, 1, 0))
-        this.ssaaComposer.addPass(this.sceneBloomPass)
+        this.sceneRenderComposer.addPass(this.sceneBloomPass)
         this.finalComposer.addPass(this.pixelMergerPass)
         this.finalComposer.addPass(new PixelAdderPass(null, this.bloomComposer.readBuffer.texture, 1, 3))
         this.finalComposer.addPass(this.saturationPass)
@@ -168,7 +169,10 @@ class SceneRendererCore
         this.envmap = new THREE.Color(1, 1, 1)
         this.fxaaEnabled = true
         this.ssaaEnabled = false
+        this.ssaoEnabled = true
         this.blackMaterial = new THREE.MeshBasicMaterial({color: new THREE.Color(0, 0, 0)})
+
+        this.stats = null
     }
 
     setEnvironmentMap(envmap)
@@ -193,7 +197,11 @@ class SceneRendererCore
 
     setBloomRadius(radius) { this.sceneBloomPass.radius = radius }
 
-    enableSSAO(enable) { this.pixelMergerPass.enableMerge(enable) }
+    enableSSAO(enable) 
+    { 
+        this.ssaoEnabled = enable
+        this.pixelMergerPass.enableMerge(enable) 
+    }
 
     setSSAORadius(radius) { this.ssaoPass.kernelRadius = radius }
 
@@ -237,18 +245,18 @@ class SceneRendererCore
     {
         if (enable && !this.ssaaEnabled)
         {
-            this.ssaaComposer.removePass(this.renderPass)
-            this.ssaaComposer.insertPass(this.ssaaPass, 0)
+            this.sceneRenderComposer.removePass(this.renderPass)
+            this.sceneRenderComposer.insertPass(this.ssaaPass, 0)
             this.ssaaEnabled = true
         }
         else if (!enable && this.ssaaEnabled)
         {
-            this.ssaaComposer.removePass(this.ssaaPass)
-            this.ssaaComposer.insertPass(this.renderPass, 0)
+            this.sceneRenderComposer.removePass(this.ssaaPass)
+            this.sceneRenderComposer.insertPass(this.renderPass, 0)
             this.ssaaEnabled = false
         }
         this.finalComposer.removePass(this.pixelMergerPass)
-        this.pixelMergerPass = new PixelMergerPass(this.ssaaComposer.readBuffer.texture, this.ssaoComposer.readBuffer.texture)
+        this.pixelMergerPass = new PixelMergerPass(this.sceneRenderComposer.readBuffer.texture, this.ssaoComposer.readBuffer.texture)
         this.finalComposer.insertPass(this.pixelMergerPass, 0)
     }
 
@@ -269,6 +277,8 @@ class SceneRendererCore
     setContrast(contrast) { this.contrastPass.setContrast(contrast) }
     
     setBrightness(brightness) { this.brightnessPass.setBrightness(brightness) }
+
+    showStats(htmlElement) { this.stats = new Stats(this.renderer, htmlElement) }
 
     /**
      * This function adds the threejs object based on its properties. If the threejs object is light, then it will be
@@ -334,7 +344,7 @@ class SceneRendererCore
         this.shouldRender = false
         this.deletePassInComposer(this.renderPass, this.bloomComposer)
         this.deletePassInComposer(this.ssaoPass, this.ssaoComposer)
-        this.deletePassInComposer((this.ssaaEnabled) ? this.ssaaPass : this.renderPass, this.ssaaComposer)
+        this.deletePassInComposer((this.ssaaEnabled) ? this.ssaaPass : this.renderPass, this.sceneRenderComposer)
         this.renderPass = new RenderPass(this.scene, threeJsCamera)
         this.bloomComposer.insertPass(this.renderPass, 0)
         this.ssaoPass = new SSAOPass(this.scene, threeJsCamera, window.innerWidth, window.innerHeight)
@@ -346,7 +356,7 @@ class SceneRendererCore
         this.ssaaPass = new SSAARenderPass(this.scene, threeJsCamera, 0xffffff, 1)
         this.ssaaPass.sampleLevel = 1
         this.ssaaPass.unbiased = true
-        this.ssaaComposer.insertPass((this.ssaaEnabled) ? this.ssaaPass : this.renderPass, 0)
+        this.sceneRenderComposer.insertPass((this.ssaaEnabled) ? this.ssaaPass : this.renderPass, 0)
         this.shouldRender = true
     }
 
@@ -362,11 +372,14 @@ class SceneRendererCore
             this.prepareForSpecialEffects()
             this.bloomComposer.setSize(window.innerWidth, window.innerHeight)
             this.bloomComposer.render()
-            this.ssaoComposer.setSize(window.innerWidth, window.innerHeight)
-            this.ssaoComposer.render()
+            if (this.ssaoEnabled)
+            {
+                this.ssaoComposer.setSize(window.innerWidth, window.innerHeight)
+                this.ssaoComposer.render()
+            }
             this.prepareForFinalPass()
-            this.ssaaComposer.setSize(window.innerWidth, window.innerHeight)
-            this.ssaaComposer.render()
+            this.sceneRenderComposer.setSize(window.innerWidth, window.innerHeight)
+            this.sceneRenderComposer.render()
             if (this.fxaaEnabled)
             {
                 this.fxaaPass.material.uniforms['resolution'].value.x = 1/(window.innerWidth * this.renderer.getPixelRatio())
@@ -374,6 +387,8 @@ class SceneRendererCore
             }
             this.finalComposer.setSize(window.innerWidth, window.innerHeight)
             this.finalComposer.render()
+            if (this.stats != null)
+                this.stats.update()
         }
     }
 
@@ -384,7 +399,7 @@ class SceneRendererCore
             Misc.postOrderTraversal(mainSceneObject, obj=>{
                 if (obj.material != undefined)
                 {
-                    if (obj.material.opacity < 1 || obj.material._alphaTest > 0)
+                    if (obj.material.transparent || obj.material.opacity < 1 || obj.material._alphaTest > 0)
                         obj.visible = false
                     else if (obj.isLight == undefined || !obj.isLight)
                         obj.material = this.blackMaterial
